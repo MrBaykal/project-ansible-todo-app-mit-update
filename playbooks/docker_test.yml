@@ -1,0 +1,13 @@
+- name: Start Docker service on multiple hosts
+  gather_facts: no
+  hosts: 
+    - _ansible_react
+    - _ansible_nodejs
+    - _ansible_postgresql
+  become: true  # Root yetkileriyle çalıştır
+  tasks:
+    - name: Start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes  # Sistemi açıldığında otomatik başlatılmasını sağlar

@@ -1,0 +1,108 @@
+- name: Install docker
+  gather_facts: No
+  any_errors_fatal: true
+  hosts: _ansible_nodejs
+  become: true
+  tasks:
+    - name: Upgrade all packages
+      ansible.builtin.yum: 
+        name: '*'
+        state: latest
+
+    # We may need to uninstall any existing Docker files from the CentOS repo first.
+    - name: Uninstall old versions of Docker
+      ansible.builtin.yum:
+        name:
+          - docker
+          - docker-client
+          - docker-client-latest
+          - docker-common
+          - docker-latest
+          - docker-latest-logrotate
+          - docker-logrotate
+          - docker-engine
+        state: absent
+      ignore_errors: yes  # Ignore errors if Docker is not already installed
+
+    - name: Install yum-utils package
+      ansible.builtin.yum:
+        name: yum-utils
+        state: present
+
+    - name: Set up the Docker repository
+      ansible.builtin.command:
+        cmd: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: Install Docker Engine and dependencies
+      ansible.builtin.yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Add user ec2-user to docker group
+      ansible.builtin.user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: Start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Copy files to the Node.js node
+      ansible.builtin.copy:
+        src: /home/ec2-user/ansible/ansible-project/node.js/
+        dest: /home/ec2-user/nodejs/
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+  # Remove the container if it exists
+    - name: Remove cw_nodejs container
+      community.docker.docker_container:
+        name: cw_nodejs
+        state: absent
+        force_kill: true
+
+  # Remove the image if it exists
+    - name: Remove clarusway/nodejs image
+      community.docker.docker_image:
+        name: clarusway/nodejs
+        state: absent
+
+    - name: Check for Dockerfile existence
+      ansible.builtin.command: ls /home/ec2-user/nodejs/Dockerfile
+      register: dockerfile_check
+      failed_when: dockerfile_check.rc != 0
+
+    - name: Build the container image
+      community.docker.docker_image:
+        name: clarusway/nodejs
+        build:
+          path: /home/ec2-user/nodejs  # Ensure this path is correct and contains the Dockerfile
+        source: build
+        state: present
+      register: image_info
+
+    - name: Print the image info
+      ansible.builtin.debug:
+        var: image_info
+
+    - name: Launch Node.js Docker container
+      community.docker.docker_container:
+        name: cw_nodejs
+        image: clarusway/nodejs
+        state: started
+        ports: 
+        - "5000:5000"
+      register: container_info
+
+    - name: Print the container info
+      ansible.builtin.debug:
+        var: container_info
