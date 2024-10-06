@@ -1,0 +1,53 @@
+---
+# tasks file for nodejs
+    - name: Copy files to the Node.js node
+      ansible.builtin.copy:
+        src: node.js/
+        dest: "{{ container_path }}"
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: '0755'
+
+  # Remove the container if it exists
+    - name: Remove {{ container_name }} container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        state: absent
+        force_kill: true
+
+  # Remove the image if it exists
+    - name: Remove {{ image_name }} image
+      community.docker.docker_image:
+        name: "{{ image_name }}"
+        state: absent
+
+    - name: Check for Dockerfile existence
+      ansible.builtin.command: ls /home/ec2-user/nodejs/Dockerfile
+      register: dockerfile_check
+      failed_when: dockerfile_check.rc != 0
+
+    - name: Build the container image
+      community.docker.docker_image:
+        name: "{{ image_name }}" 
+        build:
+          path: "{{ container_path }}"  # Ensure this path is correct and contains the Dockerfile
+        source: build
+        state: present
+      register: image_info
+
+    - name: Print the image info
+      ansible.builtin.debug:
+        var: image_info
+
+    - name: Launch Node.js Docker container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ image_name }}" 
+        state: started
+        ports: 
+        - "5000:5000"
+      register: container_info
+
+    - name: Print the container info
+      ansible.builtin.debug:
+        var: container_info 

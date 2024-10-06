@@ -1,0 +1,4 @@
+- ansible.builtin.import_playbook: docker_install.yml
+- ansible.builtin.import_playbook: docker_postgre_2.yml
+- ansible.builtin.import_playbook: docker_nodejs_2.yml
+- ansible.builtin.import_playbook: docker_react_2.yml

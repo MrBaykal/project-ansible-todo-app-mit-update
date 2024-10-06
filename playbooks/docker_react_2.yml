@@ -1,0 +1,42 @@
+# This file for the ansible import modul. docker_install part is not contained.
+- name: Install docker
+  hosts: _ansible_react
+  become: true
+  tasks:
+    - name: copy files to the react node
+      copy:
+        src: /home/ec2-user/ansible/ansible-project/react/
+        dest: /home/ec2-user/react
+
+    - name: remove cla_react container
+      community.docker.docker_container:
+        name: cla_react
+        state: absent
+        force_kill: true
+
+    - name: Forcefully remove clarusway/react image
+      community.docker.docker_image:
+        name: clarusway/react
+        state: absent
+        force_absent: yes
+  
+    - name: build container image
+      community.docker.docker_image:
+        name: clarusway/react
+        build:
+          path: /home/ec2-user/react
+        source: build
+        state: present
+
+    - name: Launch react docker container
+      community.docker.docker_container:
+        name: cla_react
+        image: clarusway/react
+        state: started
+        ports: 
+        - "3000:3000"
+      register: container_info
+    
+    - name: print the container info
+      debug:
+        var: container_info

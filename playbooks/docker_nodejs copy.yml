@@ -1,14 +1,15 @@
 - name: Install docker
   gather_facts: No
   any_errors_fatal: true
-  hosts: _ansible_react
+  hosts: _ansible_nodejs
   become: true
   tasks:
-    - name: upgrade all packages
+    - name: Upgrade all packages
       ansible.builtin.yum: 
         name: '*'
         state: latest
-    # we may need to uninstall any existing docker files from the centos repo first. 
+
+    # We may need to uninstall any existing Docker files from the CentOS repo first.
     - name: Uninstall old versions of Docker
       ansible.builtin.yum:
         name:
@@ -21,7 +22,7 @@
           - docker-logrotate
           - docker-engine
         state: absent
-      ignore_errors: yes  # Önceden yüklü değilse hata mesajlarını yok say
+      ignore_errors: yes  # Ignore errors if Docker is not already installed
 
     - name: Install yum-utils package
       ansible.builtin.yum:
@@ -47,48 +48,61 @@
         name: ec2-user
         groups: docker
         append: yes
-        
+
     - name: Start Docker service
       ansible.builtin.systemd:
         name: docker
         state: started
         enabled: yes
 
+    - name: Copy files to the Node.js node
+      ansible.builtin.copy:
+        src: /home/ec2-user/ansible/ansible-project/node.js/
+        dest: /home/ec2-user/nodejs/
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
 
-    - name: copy files to the react node
-      copy:
-        src: /home/ec2-user/ansible/ansible-project/react/
-        dest: /home/ec2-user/react
-
-    - name: remove cla_react container
+  # Remove the container if it exists
+    - name: Remove cw_nodejs container
       community.docker.docker_container:
-        name: cla_react
+        name: cw_nodejs
         state: absent
         force_kill: true
 
-    - name: Forcefully remove clarusway/react image
+  # Remove the image if it exists
+    - name: Remove clarusway/nodejs image
       community.docker.docker_image:
-        name: clarusway/react
+        name: clarusway/nodejs
         state: absent
-        force_absent: yes
-  
-    - name: build container image
+
+    - name: Check for Dockerfile existence
+      ansible.builtin.command: ls /home/ec2-user/nodejs/Dockerfile
+      register: dockerfile_check
+      failed_when: dockerfile_check.rc != 0
+
+    - name: Build the container image
       community.docker.docker_image:
-        name: clarusway/react
+        name: clarusway/nodejs
         build:
-          path: /home/ec2-user/react
+          path: /home/ec2-user/nodejs  # Ensure this path is correct and contains the Dockerfile
         source: build
         state: present
+      register: image_info
 
-    - name: Launch react docker container
+    - name: Print the image info
+      ansible.builtin.debug:
+        var: image_info
+
+    - name: Launch Node.js Docker container
       community.docker.docker_container:
-        name: cla_react
-        image: clarusway/react
+        name: cw_nodejs
+        image: clarusway/nodejs
         state: started
         ports: 
-        - "3000:3000"
+        - "5000:5000"
       register: container_info
-    
-    - name: print the container info
-      debug:
+
+    - name: Print the container info
+      ansible.builtin.debug:
         var: container_info

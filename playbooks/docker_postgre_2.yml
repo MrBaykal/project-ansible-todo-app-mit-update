@@ -1,0 +1,55 @@
+# This file for the ansible import modul. docker_install part is not contained.
+- name: Install docker
+  hosts: _ansible_postgresql
+  become: true
+  vars_files:
+    - secret.yml
+  tasks:
+    - name: copy files to the postgresql node
+      ansible.builtin.copy:
+        src: /home/ec2-user/ansible/ansible-project/postgres/
+        dest: /home/ec2-user/postgresql
+
+# Remove the container if it exists
+    - name: remove cla_postgre container
+      community.docker.docker_container:
+        name: cla_postgre
+        state: absent
+        force_kill: true
+
+# Remove the image if it exists
+    - name: remove clarusway/postgre image
+      community.docker.docker_image:
+        name: clarusway/postgre
+        state: absent
+        force_absent: true  
+
+    - name: build container image
+      community.docker.docker_image:
+        name: clarusway/postgre
+        build:
+          path: /home/ec2-user/postgresql
+        source: build
+        state: present
+      register: image_info
+
+    - name: print the image info
+      ansible.builtin.debug:
+        var: image_info
+
+    - name: Launch postgresql docker container
+      community.docker.docker_container:
+        name: cla_postgre
+        image: clarusway/postgre
+        state: started
+        ports: 
+        - "5432:5432"
+        env:
+          POSTGRES_PASSWORD: "{{ password }}"
+        volumes:
+          - /db-data:/var/lib/postgresql/data
+      register: container_info
+    
+    - name: print the container info
+      ansible.builtin.debug:
+        var: container_info

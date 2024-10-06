@@ -1,0 +1,57 @@
+# This file for the ansible import modul. docker_install part is not contained.
+- name: Install docker
+  hosts: _ansible_nodejs
+  become: true
+  tasks:
+    - name: Copy files to the Node.js node
+      ansible.builtin.copy:
+        src: /home/ec2-user/ansible/ansible-project/node.js/
+        dest: /home/ec2-user/nodejs/
+        owner: ec2-user
+        group: ec2-user
+        mode: '0755'
+
+  # Remove the container if it exists
+    - name: Remove cw_nodejs container
+      community.docker.docker_container:
+        name: cw_nodejs
+        state: absent
+        force_kill: true
+
+  # Remove the image if it exists
+    - name: Remove clarusway/nodejs image
+      community.docker.docker_image:
+        name: clarusway/nodejs
+        state: absent
+        force_absent: true  
+
+    - name: Check for Dockerfile existence
+      ansible.builtin.command: ls /home/ec2-user/nodejs/Dockerfile
+      register: dockerfile_check
+      failed_when: dockerfile_check.rc != 0
+
+    - name: Build the container image
+      community.docker.docker_image:
+        name: clarusway/nodejs
+        build:
+          path: /home/ec2-user/nodejs  # Ensure this path is correct and contains the Dockerfile
+        source: build
+        state: present
+      register: image_info
+
+    - name: Print the image info
+      ansible.builtin.debug:
+        var: image_info
+
+    - name: Launch Node.js Docker container
+      community.docker.docker_container:
+        name: cw_nodejs
+        image: clarusway/nodejs
+        state: started
+        ports: 
+        - "5000:5000"
+      register: container_info
+
+    - name: Print the container info
+      ansible.builtin.debug:
+        var: container_info

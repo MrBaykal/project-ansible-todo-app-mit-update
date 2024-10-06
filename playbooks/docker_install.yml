@@ -1,9 +1,7 @@
-- name: Install docker
-  gather_facts: No
-  any_errors_fatal: true
-  hosts: _ansible_react
+- name: install Docker
+  hosts: _development
   become: true
-  tasks:
+  tasks: 
     - name: upgrade all packages
       ansible.builtin.yum: 
         name: '*'
@@ -53,42 +51,3 @@
         name: docker
         state: started
         enabled: yes
-
-
-    - name: copy files to the react node
-      copy:
-        src: /home/ec2-user/ansible/ansible-project/react/
-        dest: /home/ec2-user/react
-
-    - name: remove cla_react container
-      community.docker.docker_container:
-        name: cla_react
-        state: absent
-        force_kill: true
-
-    - name: Forcefully remove clarusway/react image
-      community.docker.docker_image:
-        name: clarusway/react
-        state: absent
-        force_absent: yes
-  
-    - name: build container image
-      community.docker.docker_image:
-        name: clarusway/react
-        build:
-          path: /home/ec2-user/react
-        source: build
-        state: present
-
-    - name: Launch react docker container
-      community.docker.docker_container:
-        name: cla_react
-        image: clarusway/react
-        state: started
-        ports: 
-        - "3000:3000"
-      register: container_info
-    
-    - name: print the container info
-      debug:
-        var: container_info

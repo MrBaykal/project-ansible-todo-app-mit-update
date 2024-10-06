@@ -1,8 +1,10 @@
 - name: Install docker
   gather_facts: No
   any_errors_fatal: true
-  hosts: _ansible_react
+  hosts: _ansible_postgresql
   become: true
+  vars_files:
+    - secret.yml
   tasks:
     - name: upgrade all packages
       ansible.builtin.yum: 
@@ -54,41 +56,50 @@
         state: started
         enabled: yes
 
+    - name: copy files to the postgresql node
+      ansible.builtin.copy:
+        src: /home/ec2-user/ansible/ansible-project/postgres/
+        dest: /home/ec2-user/postgresql
 
-    - name: copy files to the react node
-      copy:
-        src: /home/ec2-user/ansible/ansible-project/react/
-        dest: /home/ec2-user/react
-
-    - name: remove cla_react container
+# Remove the container if it exists
+    - name: remove cla_postgre container
       community.docker.docker_container:
-        name: cla_react
+        name: cla_postgre
         state: absent
         force_kill: true
 
-    - name: Forcefully remove clarusway/react image
+# Remove the image if it exists
+    - name: remove clarusway/postgre image
       community.docker.docker_image:
-        name: clarusway/react
+        name: clarusway/postgre
         state: absent
-        force_absent: yes
-  
+
     - name: build container image
       community.docker.docker_image:
-        name: clarusway/react
+        name: clarusway/postgre
         build:
-          path: /home/ec2-user/react
+          path: /home/ec2-user/postgresql
         source: build
         state: present
+      register: image_info
 
-    - name: Launch react docker container
+    - name: print the image info
+      ansible.builtin.debug:
+        var: image_info
+
+    - name: Launch postgresql docker container
       community.docker.docker_container:
-        name: cla_react
-        image: clarusway/react
+        name: cla_postgre
+        image: clarusway/postgre
         state: started
         ports: 
-        - "3000:3000"
+        - "5432:5432"
+        env:
+          POSTGRES_PASSWORD: "{{ password }}"
+        volumes:
+          - /db-data:/var/lib/postgresql/data
       register: container_info
     
     - name: print the container info
-      debug:
+      ansible.builtin.debug:
         var: container_info
